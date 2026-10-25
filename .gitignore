@@ -1,6 +1,7 @@
-node_modules/
+client/node_modules/
 dist/
 server/config.json
 server/data/
 *.log
 .DS_Store
+
