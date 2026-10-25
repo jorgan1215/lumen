@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="LUMEN">
+  <defs>
+    <linearGradient id="lumen-gold" x1="10" y1="6" x2="55" y2="59" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f4e6c0" />
+      <stop offset="0.45" stop-color="#c9a96a" />
+      <stop offset="1" stop-color="#7d5f31" />
+    </linearGradient>
+    <radialGradient id="lumen-glow" cx="0.5" cy="0.44" r="0.56">
+      <stop offset="0" stop-color="#c9a96a" stop-opacity="0.22" />
+      <stop offset="1" stop-color="#c9a96a" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <circle cx="32" cy="32" r="31" fill="url(#lumen-glow)" />
+
+  <g fill="none" stroke="url(#lumen-gold)">
+    <circle cx="32" cy="32" r="21.5" stroke-width="1.8" />
+    <path d="M32 10.5 50.6 21.25v21.5L32 53.5 13.4 42.75v-21.5Z" stroke-width="1.4" opacity="0.75" />
+    <path d="M32 21.5 41.1 26.75v10.5L32 42.5l-9.1-5.25v-10.5Z" stroke-width="1" opacity="0.45" />
+  </g>
+
+  <circle cx="32" cy="32" r="4.6" fill="url(#lumen-gold)" />
+  <circle cx="32" cy="32" r="2.2" fill="#0b0b0e" opacity="0.55" />
+</svg>

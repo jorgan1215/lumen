@@ -1,0 +1,12 @@
+node_modules/
+dist/
+server/config.json
+server/config.json.tmp
+server/data/
+tests/
+*.log
+.DS_Store
+
+# Local previews, source snapshots and production backup archives
+.local-backups/
+backups/
