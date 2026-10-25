@@ -1,0 +1,12 @@
+{
+  "name": "lumen-photography",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LUMEN 摄影网站 —— Vite + Vue 3 前端，Node.js + Express + SQLite 后端，七牛云存储",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm --prefix client run build",
+    "start": "node server/src/index.js",
+    "setup": "npm --prefix server install && npm --prefix client install"
+  }
+}

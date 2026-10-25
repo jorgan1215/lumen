@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ink text-bone font-sans antialiased;
+  overflow-x: hidden;
+}
+
+/* 胶片颗粒噪点 */
+.grain::before {
+  content: '';
+  position: fixed;
+  inset: -100%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift 0.9s steps(4) infinite;
+}
+
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-2%, 3%); }
+  50% { transform: translate(3%, -2%); }
+  75% { transform: translate(-3%, -3%); }
+  100% { transform: translate(2%, 2%); }
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #0b0b0e; }
+::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #c9a96a; }
+
+::selection {
+  background: rgba(201, 169, 106, 0.35);
+}
+
+/* 入场揭示动画（配合 v-reveal 指令） */
+.reveal {
+  opacity: 0;
+  transform: translateY(48px);
+  transition: opacity 1s cubic-bezier(0.22, 1, 0.36, 1), transform 1s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes hero-title-in {
+  from { opacity: 0; letter-spacing: 0.6em; transform: translateY(30px); }
+  to { opacity: 1; letter-spacing: 0.18em; transform: translateY(0); }
+}
+.hero-title-in { animation: hero-title-in 1.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes scroll-hint {
+  0%, 100% { transform: translateY(0); opacity: 0.9; }
+  50% { transform: translateY(12px); opacity: 0.3; }
+}
+.scroll-hint { animation: scroll-hint 2.2s ease-in-out infinite; }
+
+@keyframes slow-pan {
+  from { transform: scale(1.08) translate(0, 0); }
+  to { transform: scale(1.08) translate(-1.5%, 1.5%); }
+}
+
+/* 灯箱过渡 */
+.lightbox-enter-active,
+.lightbox-leave-active { transition: opacity 0.35s ease; }
+.lightbox-enter-from,
+.lightbox-leave-to { opacity: 0; }
+.lightbox-enter-active .lb-stage { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.lightbox-enter-from .lb-stage { transform: scale(0.94); }
+
+.page-enter-active { transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.page-leave-active { transition: opacity 0.25s ease; }
+.page-enter-from { opacity: 0; transform: translateY(18px); }
+.page-leave-to { opacity: 0; }
+
+/* 后台表单控件 */
+.field {
+  @apply w-full bg-coal border border-white/10 rounded-md px-3 py-2 text-sm text-bone
+    placeholder:text-bone/30 outline-none transition-colors;
+}
+.field:focus { @apply border-gold/60; }
+.btn-gold {
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-gold px-4 py-2 text-sm font-medium
+    text-ink transition-all hover:bg-bone disabled:opacity-40 disabled:cursor-not-allowed;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-white/15 px-4 py-2 text-sm
+    text-bone/80 transition-all hover:border-gold/60 hover:text-gold;
+}

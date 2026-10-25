@@ -1,0 +1,17 @@
+{
+  "port": 3001,
+  "jwtSecret": "请替换成足够长的随机字符串(建议32位以上)",
+  "jwtExpiresIn": "7d",
+  "admin": {
+    "username": "admin",
+    "password": "请替换成强密码"
+  },
+  "qiniu": {
+    "accessKey": "YOUR_QINIU_ACCESS_KEY",
+    "secretKey": "YOUR_QINIU_SECRET_KEY",
+    "bucket": "your-bucket",
+    "domain": "https://cdn.example.com",
+    "prefix": "photos/"
+  },
+  "uploadTokenExpires": 3600
+}
