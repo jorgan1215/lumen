@@ -75,6 +75,7 @@ ensureColumn('photos', 'author', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('photos', 'deleted_at', 'TEXT');
 
 // 自定义相册 ID（slug）、访问密码、英文文案
+ensureColumn('albums', 'hidden', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('albums', 'slug', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('albums', 'password_hash', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('albums', 'title_en', "TEXT NOT NULL DEFAULT ''");

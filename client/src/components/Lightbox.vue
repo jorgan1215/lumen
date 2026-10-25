@@ -98,7 +98,6 @@
             <span v-if="photo.camera" class="text-bone/45">{{ cameraText }}</span>
             <span v-if="photo.lens" class="text-bone/45">{{ photo.lens }}</span>
             <span v-if="photo.taken_at" class="text-bone/45">{{ photo.taken_at }}</span>
-            <span v-if="photo.author" class="text-bone/45">© {{ photo.author }}</span>
             </div>
           </div>
 

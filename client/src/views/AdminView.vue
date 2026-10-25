@@ -100,6 +100,7 @@
                   <span class="mt-0.5 flex items-center gap-1.5 font-mono text-[9px] text-bone/30">
                     {{ t('admin.albumPhotos', { n: a.photo_count ?? 0 }) }}
                     <span v-if="a.locked" class="text-bone/45">🔒</span>
+                    <span v-if="a.hidden" class="text-gold/70">仅管理员</span>
                   </span>
                 </span>
               </button>
@@ -211,6 +212,12 @@
                     >{{ t('admin.open') }}</a>
                   </div>
                   <p class="mt-1.5 font-mono text-[10px] text-bone/25">{{ current.id || current.slug ? publicUrl : '保存并创建后生成访问链接' }}</p>
+                </div>
+
+                <div class="md:col-span-2">
+                  <label class="flex items-center gap-2 text-xs text-bone/70">
+                    <input v-model="current.hidden" type="checkbox" class="accent-[#a48140]" />隐藏相册（仅管理员可见）
+                  </label>
                 </div>
 
                 <!-- 访问密码 -->
@@ -375,6 +382,7 @@
                   @dragend="endPhotoDrag"
                 >
                   <div class="relative aspect-[4/3]">
+                    <button type="button" class="block h-full w-full cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold" :aria-label="`编辑照片：${p.description || p.title || p.id}`" @click="openEdit(p)">
                     <PhotoImage
                       :src="p.url"
                       :proxy="p.proxy_url"
@@ -384,14 +392,15 @@
                       preview-only
                       :alt="p.description || t('common.photo')"
                     />
+                    </button>
 
-                    <div class="absolute left-2 top-2 flex gap-1.5">
+                    <div class="pointer-events-none absolute left-2 top-2 flex gap-1.5">
                       <span v-if="current.cover_url === p.url" class="rounded bg-gold px-1.5 py-0.5 font-mono text-[9px] text-ink">{{ t('admin.cover') }}</span>
                       <span v-if="p.proxy_url" class="rounded bg-ink/70 px-1.5 py-0.5 font-mono text-[9px] text-bone/60 backdrop-blur">{{ t('admin.proxy') }}</span>
                       <span v-if="!p.qiniu_key" class="rounded bg-ink/70 px-1.5 py-0.5 font-mono text-[9px] text-bone/50 backdrop-blur">{{ t('admin.external') }}</span>
                     </div>
 
-                    <span class="absolute right-2 top-2 rounded bg-ink/60 px-1.5 py-0.5 font-mono text-[9px] text-bone/40 backdrop-blur">⋮⋮</span>
+                    <span class="pointer-events-none absolute right-2 top-2 rounded bg-ink/60 px-1.5 py-0.5 font-mono text-[9px] text-bone/40 backdrop-blur">⋮⋮</span>
 
                     <div class="absolute inset-x-0 bottom-0 flex justify-end gap-1.5 bg-gradient-to-t from-ink/90 to-transparent p-2 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                       <button
@@ -583,7 +592,7 @@ interface UploadTask {
 
 const router = useRouter();
 const route = useRoute();
-const adminTabs = [{key:'site',label:'网站'},{key:'albums',label:'影集'},{key:'slides',label:'轮播图'},{key:'music',label:'背景音乐'},{key:'model',label:'配置i'},{key:'trash',label:'回收站'}];
+const adminTabs = [{key:'site',label:'网站'},{key:'albums',label:'影集'},{key:'slides',label:'轮播图'},{key:'music',label:'背景音乐'},{key:'model',label:'配置'},{key:'trash',label:'回收站'}];
 const validTab = (value: unknown) => adminTabs.some(tab => tab.key === value) ? String(value) : 'site';
 const activeTab = ref(validTab(route.query.tab));
 function setTab(key: string) { activeTab.value = key; mode.value = key === 'trash' ? 'trash' : 'album'; router.replace({ query: { ...route.query, tab: key } }); if (key === 'trash') loadTrash(); }
@@ -594,7 +603,7 @@ const current = ref<AlbumDetail | null>(null);
 const emptyAlbumDraft = (): AlbumDraft => ({ title: '', title_en: '', subtitle: '', description: '', description_en: '', location: '', location_en: '', shot_at: '', slug: '', cover_url: '' });
 const albumPrompt = ref(''), albumGenerating = ref(false), photoGenerating = ref(false);
 function startNewAlbum() {
-  current.value = { ...emptyAlbumDraft(), id: 0, created_at: '', sort_order: 0, photos: [], has_password: false };
+  current.value = { ...emptyAlbumDraft(), id: 0, created_at: '', sort_order: 0, photos: [], has_password: false, hidden: false };
   albumPrompt.value = ''; newPassword.value = ''; clearPasswordFlag.value = false;
   setTab('albums');
 }

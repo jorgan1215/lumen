@@ -1,4 +1,5 @@
 export interface Album {
+  hidden?: boolean;
   id: number;
   title: string;
   title_en: string;

@@ -124,7 +124,6 @@
                     {{ pick(photo.description, photo.description_en) }}
                   </p>
                   <p class="mt-1.5 font-mono text-[10px] tracking-wider text-gold/90">{{ metaLine(photo) }}</p>
-                  <p v-if="photo.author" class="mt-1 font-mono text-[10px] text-bone/45">© {{ photo.author }}</p>
                 </figcaption>
 
 
