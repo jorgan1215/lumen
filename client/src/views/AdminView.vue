@@ -10,7 +10,7 @@
         <span v-if="!qiniuReady" class="rounded-full border border-ember/50 px-3 py-1.5 text-[11px] text-ember">
           {{ t('admin.qiniuMissing') }}
         </span>
-        <router-link to="/" class="btn-ghost !px-3 !py-1.5 text-xs">{{ t('admin.viewSite') }}</router-link>
+        <router-link :to="localePath('/')" class="btn-ghost !px-3 !py-1.5 text-xs">{{ t('admin.viewSite') }}</router-link>
         <button class="btn-ghost !px-3 !py-1.5 text-xs" @click="logout">{{ t('admin.logout') }}</button>
       </div>
     </header>
@@ -25,6 +25,7 @@
         <h2>网站信息</h2>
         <div class="admin-form-grid">
           <label>网站名称<input v-model="identityForm.name" class="field" maxlength="80" placeholder="例如 LUMEN" /></label>
+          <label>网站副标题<input v-model="identityForm.subtitle" class="field" maxlength="160" placeholder="显示在网站标题右侧，可留空" /></label>
           <label>作者名称<input v-model="identityForm.author" class="field" maxlength="120" placeholder="用于页脚版权及默认上传作者" /></label>
           <label class="admin-wide">网站简介<textarea v-model="identityForm.description" class="field" maxlength="500" placeholder="用于搜索引擎和分享摘要" /></label>
           <label>网站图标 URL<input v-model="identityForm.logo" class="field" placeholder="留空使用默认图标" /></label>
@@ -58,9 +59,9 @@
     </section>
     <section v-show="activeTab === 'music'" id="panel-music" role="tabpanel" aria-labelledby="tab-music" class="admin-config-page settings-card">
       <h2>背景音乐</h2>
-      <label>音源 URL<input v-model="musicForm.url" class="field" placeholder="https://…/music.mp3（留空关闭）" /></label>
+      <label>音源 URL<input v-model="musicForm.url" class="field" placeholder="https://…/music.mp3（留空使用默认钢琴曲）" /></label>
       <label>音量 {{ Math.round(musicForm.volume * 100) }}%<input v-model.number="musicForm.volume" type="range" min="0" max="1" step="0.01" class="mt-3 w-full accent-[#a48140]" /></label>
-      <p class="settings-note">访客点击音乐图标后循环播放，切换页面不中断。</p>
+      <p class="settings-note">导航栏音符控制播放与暂停。留空使用内置钢琴曲，音量设为 0 可静音；切换页面不中断。</p>
       <button class="btn-gold self-start" :disabled="heroSaving" @click="saveSettingsPage('music')">{{ heroSaving ? '保存中…' : '保存背景音乐设置' }}</button>
     </section>
     <section v-show="activeTab === 'model'" id="panel-model" role="tabpanel" aria-labelledby="tab-model" class="admin-config-page"><div class="space-y-6"><ServerSettings @saved="refreshStorageStatus" /><AISettings /></div></section>
@@ -101,6 +102,7 @@
                     {{ t('admin.albumPhotos', { n: a.photo_count ?? 0 }) }}
                     <span v-if="a.locked" class="text-bone/45">🔒</span>
                     <span v-if="a.hidden" class="text-gold/70">仅管理员</span>
+                    <span v-if="a.featured" class="text-gold/70">{{ t('admin.featuredBadge') }}</span>
                   </span>
                 </span>
               </button>
@@ -218,6 +220,13 @@
                   <label class="flex items-center gap-2 text-xs text-bone/70">
                     <input v-model="current.hidden" type="checkbox" class="accent-[#a48140]" />隐藏相册（仅管理员可见）
                   </label>
+                </div>
+
+                <div class="md:col-span-2">
+                  <label class="flex items-center gap-2 text-xs text-bone/70">
+                    <input v-model="current.featured" type="checkbox" class="accent-[#a48140]" />{{ t('admin.featured') }}
+                  </label>
+                  <p class="settings-note mt-2">{{ t('admin.featuredHint') }}</p>
                 </div>
 
                 <!-- 访问密码 -->
@@ -578,7 +587,7 @@ import { DEFAULT_COMPRESS, normalizeCompressOptions, prepareUpload, probeImageSi
 import { uploadBlob } from '../lib/upload';
 import { readPhotoExif } from '../lib/exif';
 import { cleanCamera, formatBytes, formatIso, shortUrl, timeAgo } from '../lib/format';
-import { pick, t } from '../lib/i18n';
+import { pick, t , localePath } from '../lib/i18n';
 
 interface UploadTask {
   id: number;
@@ -603,7 +612,7 @@ const current = ref<AlbumDetail | null>(null);
 const emptyAlbumDraft = (): AlbumDraft => ({ title: '', title_en: '', subtitle: '', description: '', description_en: '', location: '', location_en: '', shot_at: '', slug: '', cover_url: '' });
 const albumPrompt = ref(''), albumGenerating = ref(false), photoGenerating = ref(false);
 function startNewAlbum() {
-  current.value = { ...emptyAlbumDraft(), id: 0, created_at: '', sort_order: 0, photos: [], has_password: false, hidden: false };
+  current.value = { ...emptyAlbumDraft(), id: 0, created_at: '', sort_order: 0, photos: [], has_password: false, hidden: false, featured: false };
   albumPrompt.value = ''; newPassword.value = ''; clearPasswordFlag.value = false;
   setTab('albums');
 }
@@ -655,13 +664,13 @@ const editSaving = ref(false);
 const siteSlides = ref<HeroSlide[]>([]);
 const siteInterval = ref(5);
 const musicForm = reactive({ url: '', volume: .25 });
-const identityForm = reactive({ name: siteSettings.name, author: siteSettings.author, description: siteSettings.description, logo: '', timeZone: siteSettings.timeZone });
+const identityForm = reactive({ name: siteSettings.name, subtitle: siteSettings.subtitle, author: siteSettings.author, description: siteSettings.description, logo: '', timeZone: siteSettings.timeZone });
 const aboutForm = reactive({ title: '', body: '', image: '' });
 function moveSlide(i: number, d: number) { const j = i + d; if (j < 0 || j >= siteSlides.value.length) return; [siteSlides.value[i], siteSlides.value[j]] = [siteSlides.value[j], siteSlides.value[i]]; }
 async function saveSettingsPage(tab: 'site' | 'slides' | 'music') {
   heroSaving.value = true;
   try {
-    const patch = tab === 'site' ? { site_name: identityForm.name, author_name: identityForm.author, site_description: identityForm.description, site_logo: identityForm.logo, site_timezone: identityForm.timeZone, about_title: aboutForm.title, about_body: aboutForm.body, about_image: aboutForm.image }
+    const patch = tab === 'site' ? { site_name: identityForm.name, site_subtitle: identityForm.subtitle, author_name: identityForm.author, site_description: identityForm.description, site_logo: identityForm.logo, site_timezone: identityForm.timeZone, about_title: aboutForm.title, about_body: aboutForm.body, about_image: aboutForm.image }
       : tab === 'slides' ? { hero_slides: siteSlides.value, hero_interval: siteInterval.value, hero_image: '' }
       : { music_url: musicForm.url, music_volume: musicForm.volume };
     await api.updateSettings(patch);
@@ -734,7 +743,7 @@ function notify(msg: string, kind: 'ok' | 'err' = 'ok') {
 const publicUrl = computed(() => {
   if (!current.value) return '';
   const key = current.value.slug || current.value.id;
-  return `${window.location.origin}/album/${key}`;
+  return `${window.location.origin}${localePath(`/album/${key}`)}`;
 });
 
 let taskSeq = 0;
@@ -763,7 +772,7 @@ function toggleCompress() {
 
 function logout() {
   clearToken();
-  router.push('/login');
+  router.push(localePath('/login'));
 }
 
 // ---------- 影集 ----------
@@ -1198,7 +1207,7 @@ onMounted(async () => {
     const site = await api.site();
     qiniuReady.value = site.qiniuReady;
     applySiteSettings(site);
-    Object.assign(identityForm, { name: site.name, author: site.author, description: site.description, logo: site.logo, timeZone: site.timeZone });
+    Object.assign(identityForm, { name: site.name, subtitle: site.subtitle, author: site.author, description: site.description, logo: site.logo, timeZone: site.timeZone });
     if (!defaultAuthor.value) defaultAuthor.value = site.author;
     siteSlides.value = site.heroSlides?.length ? site.heroSlides : site.heroImage ? [{ url: site.heroImage, caption: '' }] : [];
     siteInterval.value = site.heroInterval || 5;
@@ -1208,7 +1217,7 @@ onMounted(async () => {
     if (albums.value.length) await selectAlbum(albums.value[0].id);
     if (activeTab.value === 'trash') { mode.value = 'trash'; await loadTrash(); }
   } catch (e: any) {
-    if (e.message.includes('未登录')) router.push('/login');
+    if (e.message.includes('未登录')) router.push(localePath('/login'));
     else notify(e.message, 'err');
   }
 });

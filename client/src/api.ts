@@ -1,5 +1,6 @@
 export interface Album {
   hidden?: boolean;
+  featured: boolean;
   id: number;
   title: string;
   title_en: string;
@@ -79,6 +80,7 @@ export type AlbumDraft = Pick<Album, 'title' | 'title_en' | 'subtitle' | 'descri
 export interface HeroSlide { url: string; caption: string; caption_en?: string }
 
 export interface SiteInfo {
+  subtitle: string;
   author: string;
   description: string;
   timeZone: string;
@@ -147,7 +149,7 @@ export const api = {
   generateAlbum: (description: string, album: Partial<Album>) => request<AlbumDraft>('/api/admin/ai/album', { method: 'POST', body: JSON.stringify({ description, album: aiAlbumContext(album) }) }),
   generatePhoto: (id: number, album: Partial<Album>, photo: Partial<Photo>) => request<Pick<Photo, 'title' | 'title_en' | 'description' | 'description_en'>>(`/api/admin/ai/photos/${id}`, { method: 'POST', body: JSON.stringify({ album: aiAlbumContext(album), photo }) }),
   site: () => request<SiteInfo>('/api/site'),
-  updateSettings: (body: { hero_image?: string; hero_slides?: HeroSlide[]; hero_interval?: number; about_title?: string; about_body?: string; about_image?: string; music_url?: string; music_volume?: number; site_name?: string; author_name?: string; site_description?: string; site_logo?: string; site_timezone?: string }) =>
+  updateSettings: (body: { hero_image?: string; hero_slides?: HeroSlide[]; hero_interval?: number; about_title?: string; about_body?: string; about_image?: string; music_url?: string; music_volume?: number; site_subtitle?: string; site_name?: string; author_name?: string; site_description?: string; site_logo?: string; site_timezone?: string }) =>
     request<Record<string, string>>('/api/admin/settings', { method: 'PUT', body: JSON.stringify(body) }),
   albums: () => request<Album[]>('/api/albums'),
 

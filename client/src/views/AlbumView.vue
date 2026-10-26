@@ -24,7 +24,7 @@
           </button>
         </form>
 
-        <router-link to="/" class="mt-8 inline-block font-mono text-[10px] uppercase tracking-[0.3em] text-bone/30 transition hover:text-gold">
+        <router-link :to="localePath('/albums')" class="mt-8 inline-block font-mono text-[10px] uppercase tracking-[0.3em] text-bone/30 transition hover:text-gold">
           ← {{ t('album.backAll') }}
         </router-link>
       </div>
@@ -133,12 +133,12 @@
         </template>
 
         <nav class="album-pagination" aria-label="切换影集">
-          <router-link v-if="adjacentAlbums.prev" :to="`/album/${adjacentAlbums.prev.slug || adjacentAlbums.prev.id}`"><span>← {{ locale === 'zh' ? '上一影集' : 'Previous collection' }}</span><strong>{{ pick(adjacentAlbums.prev.title, adjacentAlbums.prev.title_en) }}</strong></router-link>
+          <router-link v-if="adjacentAlbums.prev" :to="localePath(`/album/${adjacentAlbums.prev.slug || adjacentAlbums.prev.id}`)"><span>← {{ locale === 'zh' ? '上一影集' : 'Previous collection' }}</span><strong>{{ pick(adjacentAlbums.prev.title, adjacentAlbums.prev.title_en) }}</strong></router-link>
           <span v-else />
-          <router-link v-if="adjacentAlbums.next" :to="`/album/${adjacentAlbums.next.slug || adjacentAlbums.next.id}`" class="text-right"><span>{{ locale === 'zh' ? '下一影集' : 'Next collection' }} →</span><strong>{{ pick(adjacentAlbums.next.title, adjacentAlbums.next.title_en) }}</strong></router-link>
+          <router-link v-if="adjacentAlbums.next" :to="localePath(`/album/${adjacentAlbums.next.slug || adjacentAlbums.next.id}`)" class="text-right"><span>{{ locale === 'zh' ? '下一影集' : 'Next collection' }} →</span><strong>{{ pick(adjacentAlbums.next.title, adjacentAlbums.next.title_en) }}</strong></router-link>
         </nav>
         <div class="mt-10 flex justify-center">
-          <router-link to="/" class="btn-ghost">← {{ t('album.backAll') }}</router-link>
+          <router-link :to="localePath('/albums')" class="btn-ghost">← {{ t('album.backAll') }}</router-link>
         </div>
       </section>
 
@@ -176,7 +176,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   type Album, api, getAlbumToken, setAlbumToken, isLocked, type AlbumResponse, type LockedAlbum, type Photo,
 } from '../api';
@@ -184,14 +184,22 @@ import PhotoImage from '../components/PhotoImage.vue';
 import Lightbox from '../components/Lightbox.vue';
 import { siteSettings } from '../lib/site';
 import { originals } from '../lib/originals';
-import { locale, pick, t } from '../lib/i18n';
+import { locale, pick, t , localePath } from '../lib/i18n';
 
 const route = useRoute();
+const router = useRouter();
 const albumList = ref<Album[]>([]);
 const adjacentAlbums = computed(() => { const i = albumList.value.findIndex(a => a.id === album.value?.id); return { prev: i > 0 ? albumList.value[i - 1] : null, next: i >= 0 ? albumList.value[i + 1] : null }; });
 const album = ref<AlbumResponse | null>(null);
 const loading = ref(true);
-const openId = ref<number | null>(null);
+// The URL is the source of truth: direct links, refresh, and browser back all
+// select the same photograph once this album has finished loading/unlocking.
+const openId = computed<number | null>(() => {
+  const value = route.query.photo;
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+});
 const loadedIds = ref<Set<number>>(new Set());
 const settled = ref(false);
 const columnCount = ref(3);
@@ -263,17 +271,26 @@ function markLoaded(id: number) {
 }
 
 function metaLine(photo: Photo) {
-  return [photo.aperture.replace(/^f/i, 'F'), photo.shutter, photo.iso, photo.focal_length].filter(Boolean).join(' · ');
+  return [photo.aperture.replace(/^f/i, 'f'), photo.shutter, photo.iso, photo.focal_length].filter(Boolean).join(' · ');
 }
 
-function open(photo: Photo) { openId.value = photo.id; }
-function openIndex(i: number) { openId.value = photos.value[i]?.id ?? null; }
-function closeLightbox() { openId.value = null; }
+function showPhoto(id: number, push = false) {
+  if (!photos.value.some(photo => photo.id === id)) return;
+  const location = { path: route.path, query: { ...route.query, photo: String(id) }, hash: route.hash };
+  if (push) router.push(location);
+  else router.replace(location);
+}
+function open(photo: Photo) { showPhoto(photo.id, !current.value); }
+function openIndex(i: number) { const photo = photos.value[i]; if (photo) showPhoto(photo.id); }
+function closeLightbox() {
+  const { photo, ...query } = route.query;
+  router.replace({ path: route.path, query, hash: route.hash });
+}
 function step(d: number) {
   const n = photos.value.length;
   if (!n) return;
   const i = currentIndex.value;
-  openId.value = photos.value[(i + d + n) % n].id;
+  showPhoto(photos.value[(i + d + n) % n].id);
 }
 
 async function unlock() {
@@ -297,7 +314,6 @@ async function load() {
   originals.cancelBackground();
   album.value = null;
   loading.value = true;
-  openId.value = null;
   settled.value = false;
   loadedIds.value = new Set();
   try {

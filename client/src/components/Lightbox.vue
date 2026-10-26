@@ -1,129 +1,51 @@
 <template>
   <transition name="lightbox">
-    <div
-      v-if="photo"
-      class="fixed inset-0 z-[70] overflow-hidden bg-ink/[0.97] backdrop-blur-xl"
-      @wheel.prevent="onWheel"
-    >
-      <!-- 背景光晕 -->
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(201,169,106,0.07)_0%,transparent_62%)]" />
-
-      <!-- 顶栏 -->
-      <header class="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 px-4 pb-4 pt-4 md:px-8">
-        <div class="min-w-0">
-          <p v-if="titleText" class="mt-1.5 truncate font-serif text-sm text-bone/90">{{ titleText }}</p>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-1.5">
-          <div class="mr-1 hidden items-center gap-1 rounded-full border border-gold/10 bg-ink/60 px-1.5 py-1 backdrop-blur sm:flex">
+    <div v-if="photo" class="photo-lightbox fixed inset-0 z-[70] overflow-hidden" :class="{'has-filmstrip': items.length > 1}">
+      <header class="lb-header" @wheel.prevent="onWheel">
+        <p v-if="titleText" class="lb-title">{{ titleText }}</p>
+        <div class="lb-toolbar">
+          <div class="lb-zoom-tools">
             <button class="lb-tool" :title="`${t('lightbox.zoomOut')} (-)`" @click="zoomBy(1 / 1.3)">−</button>
-            <button
-              class="min-w-[3.1rem] px-1 font-mono text-[10px] tabular-nums text-bone/55 transition hover:text-gold"
-              :title="`${t('lightbox.reset')} (0)`"
-              @click="resetZoom"
-            >{{ Math.round(scale * 100) }}%</button>
+            <button class="lb-zoom-value" :title="`${t('lightbox.reset')} (0)`" @click="resetZoom">{{ Math.round(scale * 100) }}%</button>
             <button class="lb-tool" :title="`${t('lightbox.zoomIn')} (+)`" @click="zoomBy(1.3)">+</button>
           </div>
-          <button class="lb-tool !h-10 !w-10" :title="`${t('common.close')} (Esc)`" @click="$emit('close')">✕</button>
+          <button class="lb-tool lb-close-tool" :title="`${t('common.close')} (Esc)`" @click="$emit('close')">✕</button>
         </div>
       </header>
 
-      <!-- 舞台 -->
-      <div
-        ref="stage"
-        style="touch-action: none"
-        role="dialog" aria-modal="true" :aria-label="titleText || (locale === 'zh' ? '照片查看器' : 'Photo viewer')"
-        class="absolute inset-0 flex items-center justify-center px-4 pb-[9.5rem] pt-16 md:pb-[10.5rem]"
-        :class="{ 'lb-stage-zoomed': scale > 1 }"
-        @dblclick="onDoubleClick"
-        @pointerdown="onPointerDown"
-        @pointermove="onPointerMove"
-        @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
-        @click="onStageClick"
-      >
+      <div ref="stage" style="touch-action:none" role="dialog" aria-modal="true" :aria-label="titleText || (locale === 'zh' ? '照片查看器' : 'Photo viewer')" class="lb-stage" :class="{'lb-stage-zoomed': scale > 1}"
+        @wheel.prevent="onWheel" @dblclick="onDoubleClick" @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerUp" @click="onStageClick">
+        <div ref="viewport" class="lb-viewport" @click.self="onStageClick">
+          <div ref="imageBox" class="lb-box" :class="{'is-dragging':dragging}" :style="[boxStyle,transformStyle]">
+            <PhotoImage :key="photo.id" :photo-id="photo.id" :album-id="photo.album_id" :controls-target="controlHost" :src="photo.url" :proxy="photo.proxy_url" :width="photo.width" :height="photo.height" :alt="titleText || descriptionText || t('common.photo')" fit="contain" fill eager instant quality-badge auto-original @load="onViewerImageLoad" :controls-visible="scale <= 1.01" />
+          </div>
+          <div ref="controlHost" class="lb-controls" style="width:100%;height:100%" />
+        </div>
         <GalleryArrow direction="prev" class="lightbox-nav previous" @pointerdown.stop @click.stop="$emit('prev')" :aria-label="t('lightbox.prev')" />
         <GalleryArrow direction="next" class="lightbox-nav next" @pointerdown.stop @click.stop="$emit('next')" :aria-label="t('lightbox.next')" />
-
-        <!-- 视口：放大后的图片裁切在这里，不会盖住顶部工具条和底部信息 -->
-        <div
-          ref="viewport"
-          style="touch-action: none"
-          class="lb-viewport relative flex h-full w-full items-center justify-center overflow-hidden"
-          @click.self="onStageClick"
-        >
-          <div
-            ref="imageBox"
-            class="lb-box relative rounded-sm shadow-[0_20px_70px_-30px_rgba(70,55,25,0.2)]"
-            :class="[scale > 1 ? 'cursor-grab active:cursor-grabbing' : '', { 'is-dragging': dragging }]"
-            :style="[boxStyle, transformStyle]"
-          >
-            <PhotoImage
-              :key="photo.id"
-              :photo-id="photo.id"
-              :album-id="photo.album_id"
-              :controls-target="controlHost"
-              :src="photo.url"
-              :proxy="photo.proxy_url"
-              :width="photo.width"
-              :height="photo.height"
-              :alt="titleText || descriptionText || t('common.photo')"
-              fit="contain"
-              fill
-              eager
-              quality-badge
-              auto-original
-              :controls-visible="scale <= 1.01"
-            />
-          </div>
-          <div ref="controlHost" class="lb-controls" :style="boxStyle" />
-        </div>
       </div>
 
-      <!-- 底部信息 + 缩略图条 -->
-      <footer class="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-ink via-ink/90 to-transparent px-4 pb-4 pt-8 md:px-8">
-        <div class="mx-auto max-w-4xl text-center">
-          <p v-if="descriptionText" class="mx-auto max-w-xl text-[13px] leading-relaxed text-bone/60">
-            {{ descriptionText }}
-          </p>
-
-          <div class="lb-metadata mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 font-mono text-[11px] tracking-wider text-gold/90">
-            <div class="lb-exposure">
-            <span v-if="photo.aperture">{{ photo.aperture.replace(/^f/i, 'F') }}</span>
+      <div v-show="scale <= 1.01" class="lb-information" @wheel.prevent="onWheel">
+        <p v-if="descriptionText" class="lb-description">{{ descriptionText }}</p>
+        <div class="lb-metadata">
+          <div class="lb-exposure">
+            <span v-if="photo.aperture">{{ photo.aperture.replace(/^f/i,'f') }}</span>
             <span v-if="photo.shutter">{{ photo.shutter }}</span>
             <span v-if="photo.iso">{{ isoText }}</span>
             <span v-if="photo.focal_length">{{ photo.focal_length }}</span>
-            </div>
-            <div class="lb-equipment">
-            <span v-if="photo.camera" class="text-bone/45">{{ cameraText }}</span>
-            <span v-if="photo.lens" class="text-bone/45">{{ photo.lens }}</span>
-            <span v-if="photo.taken_at" class="text-bone/45">{{ photo.taken_at }}</span>
-            </div>
           </div>
-
-
+          <div class="lb-equipment">
+            <span v-if="photo.camera">{{ cameraText }}</span>
+            <span v-if="photo.lens">{{ photo.lens }}</span>
+            <span v-if="photo.taken_at">{{ photo.taken_at }}</span>
+          </div>
         </div>
-
-        <!-- 缩略图条 -->
-        <div v-if="items.length > 1" class="mt-4">
-          <div ref="strip" class="lb-thumbnail-strip mx-auto flex max-w-4xl gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button
-              v-for="(item, i) in items"
-              :key="item.id"
-              class="relative h-12 w-[4.5rem] shrink-0 overflow-hidden rounded-sm border transition-all duration-300"
-              :class="i === index ? 'border-gold/80 opacity-100' : 'border-gold/10 opacity-45 hover:opacity-80'"
-              @click="$emit('select', i)"
-            >
-              <PhotoImage
-                :src="item.url"
-                :proxy="item.proxy_url"
-                fill
-                preview-only
-                minimal
-                :alt="`${i + 1}`"
-              />
-            </button>
-          </div>
+      </div>
+      <footer v-if="items.length > 1" v-show="scale <= 1.01" class="lb-filmstrip" :style="filmstripStyle" @wheel.prevent.stop="onFilmstripWheel">
+        <div ref="strip" class="lb-thumbnail-strip">
+          <button v-for="(item,i) in items" :key="item.id" class="lb-thumbnail" :class="{'is-current':i === index}" :aria-label="`${locale === 'zh' ? '查看照片' : 'View photo'} ${i+1}`" :aria-current="i === index ? 'true' : undefined" @click="$emit('select',i)">
+            <PhotoImage :src="item.url" :proxy="item.proxy_url" fill preview-only minimal instant :alt="`${i+1}`" />
+          </button>
         </div>
       </footer>
     </div>
@@ -134,6 +56,8 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import type { Photo } from '../api';
 import PhotoImage from './PhotoImage.vue';
+import { originalReady } from '../lib/originals';
+import { warmImage, decodedImage } from '../lib/decodedImages';
 import GalleryArrow from './GalleryArrow.vue';
 import { anchoredTranslation, pinchTranslation, swipeDirection } from '../lib/viewerMath';
 import { cleanCamera, formatIso } from '../lib/format';
@@ -160,8 +84,20 @@ const strip = ref<HTMLElement | null>(null);
 const imageBox = ref<HTMLElement | null>(null);
 const controlHost = ref<HTMLElement | null>(null);
 const viewportSize = ref({ width: 0, height: 0 });
+const naturalSize = ref({ width: 0, height: 0 });
+function onViewerImageLoad() {
+  const image = imageBox.value?.querySelector<HTMLImageElement>('img.pi-layer');
+  if (image?.naturalWidth && image.naturalHeight) naturalSize.value = {width:image.naturalWidth,height:image.naturalHeight};
+}
+watch(() => props.photo?.id, () => { naturalSize.value = {width:0,height:0}; }, {flush:'sync'});
 let resizeObserver: ResizeObserver | undefined;
 watch(viewport, el => { resizeObserver?.disconnect(); if (el) { resizeObserver = new ResizeObserver(([entry]) => { viewportSize.value = { width: entry.contentRect.width, height: entry.contentRect.height }; clampPan(); }); resizeObserver.observe(el); } });
+
+const filmstripStyle = computed(() => {
+  const mobile = viewportSize.value.width < 768;
+  const width = items.value.length * (mobile ? 36 : 44) + Math.max(0, items.value.length - 1) * 5 + 16;
+  return {width: `min(${width}px, ${mobile ? 82 : 88}vw)`};
+});
 
 // ---------- 缩放 / 平移 ----------
 const scale = ref(1);
@@ -170,11 +106,12 @@ const ty = ref(0);
 const dragging = ref(false);
 
 const boxStyle = computed(() => {
-  const w = Number(props.photo?.width) || 0;
-  const h = Number(props.photo?.height) || 0;
-  const ratio = w > 0 && h > 0 ? w / h : 1.5;
+  const w = Number(props.photo?.width) || naturalSize.value.width;
+  const h = Number(props.photo?.height) || naturalSize.value.height;
+  const cached = decodedImage(props.photo?.url || '') || decodedImage(props.photo?.proxy_url || '');
+  const ratio = w > 0 && h > 0 ? w / h : cached ? cached.naturalWidth / cached.naturalHeight : 1.5;
   const area = viewportSize.value;
-  const width = Math.min(area.width || window.innerWidth * .92, (area.height || window.innerHeight * .6) * ratio);
+  const width = Math.min(area.width || window.innerWidth, (area.height || window.innerHeight) * ratio);
   return { width: `${width}px`, height: `${width / ratio}px` };
 
 });
@@ -224,32 +161,35 @@ function zoomBy(factor: number) {
   zoomAt(scale.value * factor);
 }
 
-let lastWheelSwitch = 0;
 let wheelSwitchAmount = 0;
 let lastWheelEvent = 0;
+let lastWheelSwitch = -Infinity;
+let wheelFrame = 0;
+let queuedDirection = 0;
+function onFilmstripWheel(e: WheelEvent) {
+  const now = performance.now();
+  const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 500 : 1);
+  if (!delta || items.value.length < 2) return;
+  if (now - lastWheelEvent > 160 || Math.sign(delta) !== Math.sign(wheelSwitchAmount)) wheelSwitchAmount = 0;
+  lastWheelEvent = now;
+  wheelSwitchAmount += delta;
+  // A wheel detent changes a photo immediately; a trackpad needs a short intentional movement.
+  if (Math.abs(wheelSwitchAmount) < 24 || now - lastWheelSwitch < 110) return;
+  queuedDirection = Math.sign(wheelSwitchAmount); wheelSwitchAmount = 0;
+  if (!wheelFrame) wheelFrame = requestAnimationFrame(() => {
+    wheelFrame = 0; lastWheelSwitch = performance.now();
+    emit(queuedDirection > 0 ? 'next' : 'prev');
+  });
+}
 function onWheel(e: WheelEvent) {
   const el = viewport.value;
   if (!el) return;
   const rect = el.getBoundingClientRect();
-  const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-  if (!inside) {
-    const now = performance.now();
-    const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? rect.height : 1);
-    if (now - lastWheelEvent > 200 || Math.sign(delta) !== Math.sign(wheelSwitchAmount)) wheelSwitchAmount = 0;
-    lastWheelEvent = now;
-    if (now - lastWheelSwitch < 450) return;
-    wheelSwitchAmount += delta;
-    if (Math.abs(wheelSwitchAmount) >= 45 && items.value.length > 1) {
-      emit(wheelSwitchAmount > 0 ? 'next' : 'prev');
-      lastWheelSwitch = now; wheelSwitchAmount = 0;
-    }
-    return;
-  }
-  wheelSwitchAmount = 0;
+  if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
   const pointX = e.clientX - rect.left - rect.width / 2;
   const pointY = e.clientY - rect.top - rect.height / 2;
-  // 按滚动量缩放：鼠标滚轮一格约 15%，触控板连续滚动更细腻
-  const factor = Math.min(1.4, Math.max(0.7, Math.exp(-e.deltaY * 0.0012)));
+  const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? rect.height : 1);
+  const factor = Math.min(1.4, Math.max(0.7, Math.exp(-delta * 0.0012)));
   zoomAt(scale.value * factor, pointX, pointY);
 }
 
@@ -380,11 +320,26 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
-async function scrollActiveThumb() {
-  await nextTick();
-  const el = strip.value?.children?.[props.index] as HTMLElement | undefined;
-  el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+let thumbFrame = 0;
+function scrollActiveThumb() {
+  if (thumbFrame) cancelAnimationFrame(thumbFrame);
+  thumbFrame = requestAnimationFrame(() => {
+    thumbFrame = 0;
+    const host = strip.value;
+    const el = host?.children[props.index] as HTMLElement | undefined;
+    if (!host || !el) return;
+    const left = el.offsetLeft, right = left + el.offsetWidth;
+    if (left < host.scrollLeft || right > host.scrollLeft + host.clientWidth) {
+      host.scrollTo({left: left - (host.clientWidth-el.offsetWidth)/2, behavior:'instant' as ScrollBehavior});
+    }
+  });
 }
+// Decode only current/adjacent cached originals (or their proxies), with a bounded decoded-image budget.
+watch(() => [props.photo?.id, ...[-1,0,1].map(offset => {
+  const n = items.value.length;
+  const p = n ? items.value[(props.index+offset+n)%n] : undefined;
+  return p ? (originalReady.has(p.url) ? p.url : p.proxy_url || p.url) : '';
+})], ([id,...urls]) => { if (id) for (const url of urls) if (typeof url === 'string') warmImage(url); }, {immediate:true});
 
 watch(() => props.photo?.id, (id, prev) => {
   if (id && !prev) {
@@ -396,12 +351,12 @@ watch(() => props.photo?.id, (id, prev) => {
   }
   pointers.clear(); pinchStart = null; hadPinch = false;
   resetZoom();
-  scrollActiveThumb();
+  nextTick(scrollActiveThumb);
 }, { immediate: true });
 
-watch(() => props.index, scrollActiveThumb);
 
 onUnmounted(() => {
+  cancelAnimationFrame(wheelFrame); cancelAnimationFrame(thumbFrame);
   resizeObserver?.disconnect();
   window.removeEventListener('keydown', onKey);
   document.body.style.overflow = '';
@@ -410,7 +365,7 @@ onUnmounted(() => {
 
 <style scoped>
 .lb-tool {
-  @apply flex h-8 w-8 items-center justify-center rounded-full text-sm text-bone/60 transition hover:bg-gold/5 hover:text-gold;
+  display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;color:#fff;font-size:18px;
 }
 .lb-controls { position: absolute; pointer-events: none; }
 .lb-controls :deep(button) { pointer-events: auto; }
@@ -418,8 +373,7 @@ onUnmounted(() => {
   transition: none;
   will-change: transform;
   transform-origin: center;
-  max-width: 92vw;
-  max-height: 76vh;
+  flex:none;
   touch-action: none;
 }
 .lb-box.is-dragging { transition: none; }

@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { siteSettings } from '../lib/site';
 import { ref } from 'vue';
-import { t } from '../lib/i18n';
+import { t , localePath } from '../lib/i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { api, setToken } from '../api';
 
@@ -41,7 +41,7 @@ async function submit() {
   try {
     const { token } = await api.login(username.value, password.value);
     setToken(token);
-    router.push((route.query.redirect as string) || '/admin');
+    router.push((route.query.redirect as string) || localePath('/admin'));
   } catch (e: any) {
     error.value = e.message || '登录失败';
   } finally {

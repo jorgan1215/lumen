@@ -2,7 +2,7 @@
   <div
     class="pi-frame"
     :style="frameStyle"
-    :class="{ 'pi-frame--fill': fill }"
+    :class="{ 'pi-frame--fill': fill, 'pi-frame--instant': instant }"
   >
     <!-- 底层：代理图 / 唯一图源 -->
     <img
@@ -57,9 +57,9 @@
       </svg>
       <span class="pi-tooltip">{{ showingOriginal ? t('image.original') : originalRequested && !(fullFailed || originalErrors.has(src)) ? (locale === 'zh' ? '原图加载中…' : 'Loading…') : (fullFailed || originalErrors.has(src)) ? (locale === 'zh' ? '重试原图' : 'Retry') : t('image.preview') }}</span>
     </button>
-    <button v-if="qualityBadge && controlsVisible" type="button" class="pi-download" :disabled="downloading" :aria-label="locale === 'zh' ? '下载原图' : 'Download original'" :title="downloadError || (locale === 'zh' ? '下载原图' : 'Download original')" @pointerdown.stop @dblclick.stop @click.stop="download">
+    <button v-if="qualityBadge && controlsVisible" type="button" class="pi-download" :disabled="downloading" :aria-busy="downloading" :aria-label="locale === 'zh' ? '下载原图' : 'Download original'" :title="downloadError || (locale === 'zh' ? '下载原图' : 'Download original')" @pointerdown.stop @dblclick.stop @click.stop="download">
       <svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-      <span class="pi-tooltip">{{ downloading ? (locale === 'zh' ? '下载中…' : 'Downloading…') : (locale === 'zh' ? '下载' : 'Download') }}</span>
+      <span class="pi-tooltip">{{ downloading ? (locale === 'zh' ? '正在开始下载…' : 'Starting download…') : (locale === 'zh' ? '下载' : 'Download') }}</span>
     </button>
     <p v-if="downloadError" class="pi-download-error" role="alert">{{ downloadError }}</p>
 
@@ -90,7 +90,8 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { originalReady, originalErrors, originals } from '../lib/originals';
 import { siteSettings } from '../lib/site';
-import { getToken, getAlbumToken } from '../api';
+import { decodedImage } from '../lib/decodedImages';
+import { startPhotoDownload } from '../lib/download';
 import { t, locale } from '../lib/i18n';
 
 const props = withDefaults(defineProps<{
@@ -102,6 +103,7 @@ const props = withDefaults(defineProps<{
   eager?: boolean;
   fit?: 'cover' | 'contain';
   minimal?: boolean;
+  instant?: boolean;
   /** 填满父容器（不按比例占位），用于头图这类固定高度的区域 */
   fill?: boolean;
   /** 只加载代理图，不预载原图（缩略图条、后台列表用） */
@@ -133,9 +135,9 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ load: []; error: [] }>();
 
-const baseLoaded = ref(false);
+const baseLoaded = ref(props.instant && Boolean(decodedImage(props.proxy || props.src)));
 const baseFailed = ref(false);
-const fullLoaded = ref(false);
+const fullLoaded = ref(props.instant && props.src !== (props.proxy || props.src) && Boolean(decodedImage(props.src)));
 const fullFailed = ref(false);
 const announced = ref(false);
 
@@ -150,33 +152,20 @@ function requestOriginal() {
   originals.request(props.src, true);
   if (props.src === baseSrc.value && baseFailed.value) { baseFailed.value = false; baseAttempt.value++; }
 }
-async function download() {
+function download() {
   if (downloading.value || !props.src) return;
   downloading.value = true; downloadError.value = '';
   try {
-    const headers: Record<string, string> = {};
-    if (getToken()) headers.Authorization = `Bearer ${getToken()}`;
-    if (props.albumId && getAlbumToken(props.albumId)) headers['X-Album-Token'] = getAlbumToken(props.albumId);
-    let response: Response;
-    try {
-      response = await fetch(props.src);
-      if (!response.ok || response.type === 'opaque') throw new Error();
-    } catch {
-      if (!props.photoId) throw new Error();
-      response = await fetch(`/api/photos/${props.photoId}/download`, { headers });
-      if (!response.ok) throw new Error();
+    if (props.photoId) {
+      startPhotoDownload(props.photoId, props.albumId, message => { downloadError.value = message; downloading.value = false; });
+    } else {
+      const link = document.createElement('a'); link.href=props.src; link.target='_blank'; link.rel='noopener';
+      link.download='photo';document.body.appendChild(link);link.click();link.remove();
     }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const ext = blob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-    link.href = url; link.download = `${siteSettings.author.replace(/[\\/:*?"<>|]/g, '-')}-${Date.now()}.${ext}`;
-    document.body.appendChild(link); link.click(); link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch {
     downloadError.value = locale.value === 'zh' ? '暂时无法下载，请稍后重试。' : 'Download unavailable. Please try again.';
-
-  } finally { downloading.value = false; }
+  }
+  window.setTimeout(() => { downloading.value = false; }, 1200);
 }
 const fullVisible = computed(() =>
   !fullFailed.value && Boolean(props.src) && props.src !== baseSrc.value && ((originalReady.has(props.src) && (props.qualityBadge || props.originalStatus || props.upgradeOriginal)) || (!props.previewOnly && !props.qualityBadge))); 

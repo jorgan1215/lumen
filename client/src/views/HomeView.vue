@@ -19,19 +19,9 @@
       <div v-if="loading" class="py-24 text-center text-gold">{{ t('common.loading') }}</div>
       <p v-else-if="!albums.length" class="py-24 text-center">{{ t('home.noAlbums') }}</p>
       <div v-else class="collection-list">
-        <article v-for="(album, i) in albums" :key="album.id" v-reveal class="collection-entry" :class="{ reverse: i % 2 === 1 }">
-          <router-link :to="`/album/${album.key || album.slug || album.id}`" class="gilded-cover" :aria-label="pick(album.title, album.title_en)">
-            <div class="cover-image"><PhotoImage preview-only :src="album.cover_url" :proxy="album.cover_proxy_url || ''" fill :alt="pick(album.title, album.title_en)" /></div>
-            <span v-if="album.locked" class="cover-lock" aria-label="加密影集">🔒</span>
-          </router-link>
-          <div class="collection-copy">
-            <p class="editorial-label">{{ album.subtitle || 'COLLECTION' }}</p>
-            <router-link :to="`/album/${album.key || album.slug || album.id}`"><h2>{{ pick(album.title, album.title_en) }}</h2></router-link>
-            <p class="collection-description">{{ pick(album.description, album.description_en) }}</p>
-            <p class="collection-location">{{ [pick(album.location, album.location_en), album.shot_at].filter(Boolean).join(' · ') }}</p>
-          </div>
-        </article>
+        <CollectionEntry v-for="(album, i) in albums" :key="album.id" :album="album" :reverse="i % 2 === 1" />
       </div>
+      <router-link :to="localePath('/albums')" class="archive-link">{{ t('archive.browse') }} <span aria-hidden="true">↗</span></router-link>
     </section>
   </main>
 </template>
@@ -40,8 +30,8 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { siteSettings, applySiteSettings } from '../lib/site';
 import GalleryArrow from '../components/GalleryArrow.vue';
 import { api, type Album, type HeroSlide } from '../api';
-import PhotoImage from '../components/PhotoImage.vue';
-import { pick, t } from '../lib/i18n';
+import CollectionEntry from '../components/CollectionEntry.vue';
+import { pick, t , localePath } from '../lib/i18n';
 const albums = ref<Album[]>([]), slides = ref<HeroSlide[]>([]);
 const active = ref(0), loading = ref(true), paused = ref(false), error = ref('');
 let timer = 0, interval = 5;
@@ -53,8 +43,8 @@ onMounted(async () => {
   try {
     const [site, list] = await Promise.all([api.site(), api.albums()]);
     applySiteSettings(site);
-    albums.value = list;
-    slides.value = site.heroSlides?.length ? site.heroSlides : site.heroImage ? [{ url: site.heroImage, caption: '' }] : list.filter(a => a.cover_url).map(a => ({ url: a.cover_url, caption: pick(a.description, a.description_en) }));
+    albums.value = list.filter(album => album.featured);
+    slides.value = site.heroSlides?.length ? site.heroSlides : site.heroImage ? [{ url: site.heroImage, caption: '' }] : albums.value.filter(a => a.cover_url).map(a => ({ url: a.cover_url, caption: pick(a.description, a.description_en) }));
     interval = Math.max(2, site.heroInterval || 5); schedule();
   } catch(e: any) { error.value = e.message; } finally { loading.value = false; }
 });

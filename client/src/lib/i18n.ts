@@ -5,8 +5,7 @@ export type Locale = 'zh' | 'en';
 const STORAGE_KEY = 'lumen_locale';
 
 function initialLocale(): Locale {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved === 'en' ? 'en' : 'zh';
+  return /^\/en(?:\/|$)/.test(window.location.pathname) ? 'en' : 'zh';
 }
 
 export const locale = ref<Locale>(initialLocale());
@@ -15,7 +14,8 @@ document.documentElement.lang = locale.value === 'en' ? 'en' : 'zh-CN';
 /** [中文, English] */
 const dict: Record<string, [string, string]> = {
   // 导航 / 通用
-  'nav.albums': ['影集', 'Collections'],
+  'nav.albums': ['精选', 'Selected'],
+  'nav.all': ['全部', 'All'],
   'nav.admin': ['管理', 'Admin'],
   'nav.lang': ['EN', '中文'],
   'common.photos': ['张照片', 'photos'],
@@ -38,8 +38,19 @@ const dict: Record<string, [string, string]> = {
   'home.tagline2': ['这里是一些被时间留住的光。', 'A collection of light held still by time.'],
   'home.scroll': ['Scroll', 'Scroll'],
   'home.collections': ['Collections', 'Collections'],
-  'home.albums': ['影集', 'Collections'],
-  'home.noAlbums': ['还没有影集。', 'No collections yet.'],
+  'home.albums': ['精选影集', 'Selected collections'],
+  'home.noAlbums': ['暂无精选影集，去全部影集看看吧。', 'No selected collections yet. Explore the archive.'],
+  'archive.title': ['全部影集', 'All collections'],
+  'archive.intro': ['循着时间，重访那些被光留住的片刻。', 'A journey through the moments held in light.'],
+  'archive.empty': ['还没有影集。', 'No collections yet.'],
+  'archive.undated': ['未注明年份', 'Year unspecified'],
+  'archive.noMonth': ['月份未注明', 'Month unspecified'],
+  'archive.unrecorded': ['拍摄日期未注明', 'Date unspecified'],
+  'archive.count': ['{n} 本影集', '{n} collections'],
+  'archive.browse': ['浏览全部影集', 'Explore all collections'],
+  'admin.featured': ['加入精选影集', 'Include in selected collections'],
+  'admin.featuredHint': ['勾选后在首页精选区展示；未勾选的公开影集仍可在“全部”中浏览。隐藏影集仅管理员可见。', 'Show in the selected section on the home page. Other public collections remain in All. Hidden collections are only visible to administrators.'],
+  'admin.featuredBadge': ['精选', 'Selected'],
   'home.goAdmin': ['到后台', 'Open the dashboard'],
   'home.createFirst': ['创建第一个吧。', 'to create your first one.'],
   'home.enter': ['进入影集', 'View collection'],
@@ -52,7 +63,7 @@ const dict: Record<string, [string, string]> = {
   'album.collection': ['Collection', 'Collection'],
   'album.photos': ['{n} 张照片', '{n} photos'],
   'album.empty': ['这个影集还没有照片', 'This collection has no photos yet'],
-  'album.backAll': ['返回首页', 'Back to home'],
+  'album.backAll': ['全部影集', 'All collections'],
   'album.loadingPhotos': ['已加载 {n} / {total}', '{n} / {total} loaded'],
   'album.lockedTitle': ['这本影集已加密', 'This collection is protected'],
   'album.lockedHint': ['输入访问密码后查看照片', 'Enter the password to view the photos'],
@@ -249,4 +260,10 @@ export function setLocale(next: Locale) {
 
 export function toggleLocale() {
   setLocale(locale.value === 'zh' ? 'en' : 'zh');
+}
+
+/** Public paths encode the language, so copied links are deterministic. */
+export function localePath(path: string, target: Locale = locale.value) {
+  const plain = path.replace(/^\/en(?=\/|$)/, '') || '/';
+  return target === 'en' ? `/en${plain === '/' ? '' : plain.startsWith('/#') || plain.startsWith('/?') ? plain.slice(1) : plain}` : plain;
 }

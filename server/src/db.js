@@ -76,6 +76,8 @@ ensureColumn('photos', 'deleted_at', 'TEXT');
 
 // 自定义相册 ID（slug）、访问密码、英文文案
 ensureColumn('albums', 'hidden', 'INTEGER NOT NULL DEFAULT 0');
+// 保留已有影集在首页的展示；之后可在管理端逐一取消精选。
+ensureColumn('albums', 'featured', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumn('albums', 'slug', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('albums', 'password_hash', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('albums', 'title_en', "TEXT NOT NULL DEFAULT ''");

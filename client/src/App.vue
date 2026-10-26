@@ -1,7 +1,6 @@
 <template>
   <div class="grain min-h-screen">
     <SiteNav />
-    <BackgroundMusic />
     <router-view v-slot="{ Component }">
       <transition name="page" mode="out-in">
         <component :is="Component" />
@@ -16,11 +15,11 @@ import { onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { siteSettings, loadSiteSettings } from './lib/site';
 import SiteNav from './components/SiteNav.vue';
-import BackgroundMusic from './components/BackgroundMusic.vue';
+import { t, locale } from './lib/i18n';
 const route = useRoute();
 onMounted(() => { loadSiteSettings().catch(console.error); });
-watch(() => [siteSettings.name, siteSettings.author, route.name], () => {
-  if (route.name === 'home') document.title = `${siteSettings.name} · ${siteSettings.author}`;
-  else if (route.name !== 'album') document.title = `${route.name === 'about' ? 'About' : route.name === 'admin' ? '管理中心' : '登录'} · ${siteSettings.name}`;
+watch(() => [siteSettings.name, siteSettings.author, route.meta.page, locale.value], () => {
+  if (route.meta.page === 'home') document.title = `${siteSettings.name} · ${siteSettings.author}`;
+  else if (route.meta.page !== 'album') document.title = `${route.meta.page === 'albums' ? t('archive.title') : route.meta.page === 'about' ? 'About' : route.meta.page === 'admin' ? '管理中心' : '登录'} · ${siteSettings.name}`;
 }, { immediate: true });
 </script>

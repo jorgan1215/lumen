@@ -111,7 +111,7 @@ function auth(req, res, next) {
 function publicAlbum(album) {
   if (!album) return null;
   const { password_hash: hash, ...rest } = album;
-  return { ...rest, hidden: Boolean(rest.hidden), locked: Boolean(hash), has_password: Boolean(hash) };
+  return { ...rest, hidden: Boolean(rest.hidden), featured: Boolean(rest.featured), locked: Boolean(hash), has_password: Boolean(hash) };
 }
 
 const findAlbum = (key) => row(
@@ -282,7 +282,7 @@ app.get('/api/albums', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const list = rows(db.prepare(`
     SELECT a.id, a.title, a.subtitle, a.title_en, a.description, a.description_en,
-      a.location, a.location_en, a.cover_url, a.slug, a.shot_at, a.sort_order, a.created_at, a.hidden,
+      a.location, a.location_en, a.cover_url, a.slug, a.shot_at, a.sort_order, a.created_at, a.hidden, a.featured,
       (a.password_hash <> '') AS locked,
       (SELECT COUNT(*) FROM photos p WHERE p.album_id = a.id AND p.deleted_at IS NULL) AS photo_count,
       (SELECT COUNT(*) FROM photos p WHERE p.album_id = a.id AND p.deleted_at IS NOT NULL) AS trash_count,
@@ -290,7 +290,7 @@ app.get('/api/albums', (req, res) => {
         WHERE p.album_id = a.id AND p.url = a.cover_url AND p.deleted_at IS NULL
         LIMIT 1) AS cover_proxy_url
     FROM albums a WHERE a.hidden = 0 OR ? = 1 ORDER BY a.sort_order ASC, a.id DESC
-  `).all(isAdmin(req) ? 1 : 0)).map((a) => ({ ...a, hidden: Boolean(a.hidden), locked: Boolean(a.locked), key: albumKey(a) }));
+  `).all(isAdmin(req) ? 1 : 0)).map((a) => ({ ...a, hidden: Boolean(a.hidden), featured: Boolean(a.featured), locked: Boolean(a.locked), key: albumKey(a) }));
   res.json(list);
 });
 
@@ -338,7 +338,12 @@ app.post('/api/albums/:key/unlock', (req, res) => {
   res.json({ token: albumToken(album.id) });
 });
 
-app.get('/api/photos/:id/download', async (req, res) => {
+async function handlePhotoDownload(req, res) {
+  if (req.method === 'POST') {
+    const access = str(req.body?.access_token);
+    if (access) req.headers.authorization = `Bearer ${access}`;
+    req.headers['x-album-token'] = str(req.body?.album_token);
+  }
   const photo = row(db.prepare('SELECT * FROM photos WHERE id = ? AND deleted_at IS NULL').get(req.params.id));
   if (!photo) return res.status(404).json({ error: '照片不存在' });
   const album = row(db.prepare('SELECT * FROM albums WHERE id = ?').get(photo.album_id));
@@ -347,7 +352,9 @@ app.get('/api/photos/:id/download', async (req, res) => {
   if (!isAdmin(req) && !albumUnlocked(req, album)) return res.status(403).json({ error: '请先解锁影集' });
   try { await downloadPhoto(photo, res); }
   catch (error) { if (!res.headersSent) res.status(502).json({ error: '暂时无法下载，请稍后重试' }); else res.destroy(); }
-});
+}
+app.get('/api/photos/:id/download', handlePhotoDownload);
+app.post('/api/photos/:id/download', express.urlencoded({ extended:false, limit:'8kb' }), handlePhotoDownload);
 
 // ---------- 上传凭证 ----------
 
@@ -384,13 +391,14 @@ app.post('/api/admin/albums', auth, (req, res) => {
   const max = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM albums').get().m;
   const info = db.prepare(`
     INSERT INTO albums (title, subtitle, description, cover_url, location, shot_at, sort_order,
-      slug, password_hash, title_en, description_en, location_en, hidden)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      slug, password_hash, title_en, description_en, location_en, hidden, featured)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     title.trim(), str(body.subtitle), str(body.description), str(body.cover_url),
     str(body.location), str(body.shot_at), Number(max) + 1,
     slug, password ? hashPassword(password) : '',
     str(body.title_en), str(body.description_en), str(body.location_en), body.hidden === true || body.hidden === 1 ? 1 : 0,
+    body.featured === true || body.featured === 1 ? 1 : 0,
   );
   res.json(publicAlbum(row(db.prepare('SELECT * FROM albums WHERE id = ?').get(info.lastInsertRowid))));
 });
@@ -415,7 +423,7 @@ app.put('/api/admin/albums/:id', auth, (req, res) => {
   const value = (key) => (key in body ? str(body[key], exist[key]) : exist[key]);
   db.prepare(`
     UPDATE albums SET title = ?, subtitle = ?, description = ?, cover_url = ?, location = ?, shot_at = ?,
-      sort_order = ?, slug = ?, password_hash = ?, title_en = ?, description_en = ?, location_en = ?, hidden = ?
+      sort_order = ?, slug = ?, password_hash = ?, title_en = ?, description_en = ?, location_en = ?, hidden = ?, featured = ?
     WHERE id = ?
   `).run(
     value('title'), value('subtitle'), value('description'), value('cover_url'),
@@ -423,6 +431,7 @@ app.put('/api/admin/albums/:id', auth, (req, res) => {
     slug, passwordHash,
     value('title_en'), value('description_en'), value('location_en'),
     'hidden' in body ? (body.hidden === true || body.hidden === 1 ? 1 : 0) : exist.hidden,
+    'featured' in body ? (body.featured === true || body.featured === 1 ? 1 : 0) : exist.featured,
     exist.id,
   );
   res.json(publicAlbum(row(db.prepare('SELECT * FROM albums WHERE id = ?').get(exist.id))));

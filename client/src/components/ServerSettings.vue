@@ -23,6 +23,7 @@
   </section>
 </template>
 <script setup lang="ts">
+import { localePath } from '../lib/i18n';
 import {onMounted,reactive,ref} from 'vue';
 import {useRouter} from 'vue-router';
 import {api,clearToken} from '../api';
@@ -39,7 +40,7 @@ async function save(){
     Object.assign(form,result);Object.assign(secrets,{accessKey:'',secretKey:'',password:'',jwtSecret:''});
     window.dispatchEvent(new Event('lumen:settings-updated'));emit('saved');
     message.value=result.requiresRestart ? '已保存，端口将在重启服务后生效' : '服务配置已保存';
-    if(result.requiresLogin){clearToken();router.push('/login');}
+    if(result.requiresLogin){clearToken();router.push(localePath('/login'));}
   }catch(e:any){message.value=e.message;error.value=true;}finally{busy.value=false;}
 }
 </script>
